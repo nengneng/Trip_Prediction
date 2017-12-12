@@ -19,3 +19,5 @@ DAILY DATA FOR A MONTH
 - precipitation
 - snowfall and snow depth (inches) for all days of the selected month. 
 
+Traffic congestion place
+http://abc7ny.com/traffic/9-of-the-nations-worst-bottlenecks-are-right-here/1095908/
