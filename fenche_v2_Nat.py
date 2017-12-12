@@ -188,7 +188,7 @@ Test.haversineDist.describe()
 '''
 Location: 
     - Categorized Long/Lat
-    - IsBusyLocation(start/end), 
+
 
     https://datascience.stackexchange.com/questions/13567/ways-to-deal-with-longitude-latitude-feature
     https://datascience.stackexchange.com/questions/23651/can-gps-coordinates-latitude-and-longitude-be-used-as-features-in-a-linear-mod
@@ -224,6 +224,69 @@ plt.hist(Train.geoDist, normed=True, bins=100)
 Train.geoDist.describe()
 
 Train.geoDist.value_counts() #why geoDist is just these specific ones??
+
+'''
+Remove outliers:
+    - Super long trips >2000 seconds
+    - Super short trips < 60 seconds
+
+'''
+removedExtremeDurations = Train.loc[Train['duration'] < 1500]
+len(removedExtremeDurations)/len(Train) #0.9434903839113137
+plt.hist(removedExtremeDurations.duration, normed=True, bins=50)
+
+removedExtremeDurations2 = removedExtremeDurations.loc[removedExtremeDurations['duration'] > 60]
+len(removedExtremeDurations2)/len(Train) #0.9376480884631344
+
+OldTrain = Train
+Train = removedExtremeDurations2.reset_index(drop = True)
+Train.shape
+removedExtremeDurations2.shape
+
+
+
+'''
+Location
+    - Get center center lat, lng
+    - Get start distance to city center
+    - Get HeadingCityCenter
+
+'''
+Train['end_lng'].median #-74.004326
+Train['end_lat'].median # 40.719986
+CityCenter_lng_Train_ls = [-74.004326] * 12101019
+CityCenter_lat_Train_ls = [40.719986] * 12101019
+CityCenter_train = pd.DataFrame({'CityCenter_lng': CityCenter_lng_Train_ls, 'CityCenter_lat': CityCenter_lat_Train_ls})
+
+Train = Train.join(CityCenter_train)
+
+
+#distance to City Center from start
+TrainStartlat = Train['start_lat'].tolist()
+TrainStartlon = Train['start_lng'].tolist()
+TrainCityCenterlat = Train['CityCenter_lat'].tolist()
+TrainCityCenterlon = Train['CityCenter_lng'].tolist()
+
+DistanceToCityCenter_Train = list(map(distance, TrainStartlat, TrainStartlon, TrainCityCenterlat, TrainCityCenterlon))
+
+DistanceToCityCenter_TrainDF = pd.DataFrame({'DistanceStartToCityCenter': DistanceToCityCenter_Train})
+
+Train = pd.concat([Train, DistanceToCityCenter_TrainDF], axis=1)
+
+#heading to CityCenter
+def heading(lat1, lng1, lat2, lng2):
+    
+    lat1, lng1 = math.radians(lat1), math.radians(lng1)
+    lat2, lng2 = math.radians(lat2), math.radians(lng2)
+    aa = np.sin(lng2 - lng1) * np.cos(lat2)
+    bb = np.cos(lat1) * np.sin(lat2) - np.sin(lat1) * np.cos(lat2) * np.cos(lng2 - lng1)
+    return np.arctan2(aa, bb) + np.pi 
+
+HeadingToCityCenter_Train = list(map(heading, TrainStartlat, TrainStartlon, TrainCityCenterlat, TrainCityCenterlon))
+
+HeadingToCityCenter_TrainDF = pd.DataFrame({'HeadingToCityCenter': HeadingToCityCenter_Train})
+
+Train = pd.concat([Train, HeadingToCityCenter_TrainDF], axis=1)
 
 
 '''
@@ -278,11 +341,12 @@ import numpy as np
 Train = pd.read_csv(r'C:\Users\ds1\Downloads\HomeWork_Lyft\train_clean.csv')
 #Test = pd.read_csv(r'C:\Users\ds1\Downloads\HomeWork_Lyft\test_clean.csv')
 Train.isnull().values.any()
-
+Train.head()
 
 import sklearn
 from sklearn import linear_model
 from sklearn.cross_validation import train_test_split
+from sklearn.model_selection import GridSearchCV
 from sklearn.feature_selection import RFE
 from sklearn.preprocessing import OneHotEncoder, scale, LabelEncoder
 from sklearn.metrics import mean_squared_error, r2_score
@@ -292,6 +356,18 @@ plt.scatter(Train['haversineDist'], Train['duration'])
 plt.xlabel('haversineDist')
 plt.ylabel('duration')
 plt.title('haversineDist vs duration')
+plt.show()
+
+plt.scatter(Train['DistanceStartToCityCenter'], Train['duration'])
+plt.xlabel('DistanceStartToCityCenter')
+plt.ylabel('duration')
+plt.title('DistanceStartToCityCenter vs duration')
+plt.show()
+
+plt.scatter(Train['HeadingToCityCenter'], Train['duration'])
+plt.xlabel('HeadingToCityCenter')
+plt.ylabel('duration')
+plt.title('HeadingToCityCenter vs duration')
 plt.show()
 
 plt.scatter(Train['geoDist'], Train['duration'])
@@ -338,33 +414,27 @@ plt.plot(durationVSstart_hour)
 '''
 First round, duration as target.
 '''
+TrainSample = Train.sample(1124373)
 
-#try data with outliers removed 
-removedExtremeDurations = Train.loc[Train['duration'] < 1500]
-len(removedExtremeDurations)/len(Train) #0.8822549380046639
-plt.hist(removedExtremeDurations.duration, normed=True, bins=50)
 
-#small sample to compare models
-SampledRemovedExtremeDurations = removedExtremeDurations.sample(822387)
-
-TrainFeatures = SampledRemovedExtremeDurations[['start_year', 'start_month', 'start_day',  'start_dayOfWeek',  'start_hour', 'start_minute', 'start_second', 'start_isWeekend',  'start_isHoliday','haversineDist', 'geoDist', 'start_geohash', 'end_geohash']]
+TrainFeatures = TrainSample[['start_year', 'start_month', 'start_day',  'start_dayOfWeek',  'start_hour', 'start_minute', 'start_second', 'start_isWeekend',  'start_isHoliday','haversineDist', 'geoDist', 'start_geohash', 'end_geohash', 'DistanceStartToCityCenter', 'HeadingToCityCenter']]
             
 TrainFeatures[['start_year', 'start_month', 'start_day', 'start_dayOfWeek', 'start_hour', 'start_minute', 'start_second', 'start_isWeekend',  'start_isHoliday', 'geoDist', 'start_geohash', 'end_geohash']] = TrainFeatures[['start_year', 'start_month', 'start_day', 'start_dayOfWeek', 'start_hour', 'start_minute', 'start_second', 'start_isWeekend',  'start_isHoliday', 'geoDist', 'start_geohash', 'end_geohash']].astype(object)
 
 
-#baseline model: regression only use numeric features
-X_train, X_test, Y_train, Y_test= train_test_split(TrainFeatures, SampledRemovedExtremeDurations['duration'], test_size=0.4, random_state=2017)
+#baseline model: regression only use haversineDist  numeric features
+X_train, X_test, Y_train, Y_test= train_test_split(TrainFeatures, TrainSample['duration'], test_size=0.4, random_state=2017)
 print(len(X_train), len(X_test), len(Y_train), len(Y_test))
-#493432 328955 493432 328955
+#674623 449750 674623 449750
 
 lm = linear_model.LinearRegression()
 lm.fit(X_train[['haversineDist']], Y_train)
 predict_train = lm.predict(X_train[['haversineDist']])
 predict_test = lm.predict(X_test[['haversineDist']])
 print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
-#Mean squared error for train 69972.70
+#Mean squared error for train 71446.19
 print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
-#Mean squared error for test: 70340.33
+#Mean squared error for test: 71278.77
 
 #for plot of any model
 plt.scatter(Y_test, predict_test)
@@ -380,18 +450,18 @@ plt.hlines(y = 0, xmin = 0, xmax = 50)
 plt.title('Residual Plot using Train(blue) and Test(green)')
 plt.ylabel('residual')
 
-#2nd model, scale numeric features for regression
-X_train_scale=scale(X_train[['haversineDist']])
-X_test_scale=scale(X_test[['haversineDist']])
+#2nd model: regression use numeric features
+X_train_scale=scale(X_train[['haversineDist',  'DistanceStartToCityCenter', 'HeadingToCityCenter']])
+X_test_scale=scale(X_test[['haversineDist', 'DistanceStartToCityCenter', 'HeadingToCityCenter']])
 
 lm = linear_model.LinearRegression()
 lm.fit(X_train_scale, Y_train)
 predict_train = lm.predict(X_train_scale)
 predict_test = lm.predict(X_test_scale)
 print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
-#Mean squared error for train 69972.70
+#Mean squared error for train  70336.25
 print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
-#Mean squared error for test: 70341.41
+#Mean squared error for test:  70189.63
 
 
 #3rd model, include categorical features with LabelEncoder
@@ -399,11 +469,11 @@ le=LabelEncoder()
 #Cat_Train = X_train.select_dtypes(include=[object])
 Cat_Train = X_train[['start_year', 'start_month', 'start_dayOfWeek', 'start_hour',  'start_isWeekend',  'start_isHoliday', 'geoDist']]
 Cat_Train = Cat_Train.apply(le.fit_transform)
-Cat_Train.head()
+#Cat_Train.head()
 enc = OneHotEncoder()
 enc.fit(Cat_Train)
 onehotlabels_train = enc.transform(Cat_Train).toarray()
-onehotlabels_train.shape
+#onehotlabels_train.shape
 
 
 le=LabelEncoder()
@@ -413,36 +483,35 @@ Cat_test = Cat_test.apply(le.fit_transform)
 enc = OneHotEncoder()
 enc.fit(Cat_test)
 onehotlabels_test = enc.transform(Cat_test).toarray()
-onehotlabels_test.shape
+#onehotlabels_test.shape
 
 lm = linear_model.LinearRegression()
 lm.fit(onehotlabels_train, Y_train)
 predict_train = lm.predict(onehotlabels_train)
 predict_test = lm.predict(onehotlabels_test)
 print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
-#Mean squared error for train 101063.62
+#Mean squared error for train 102783.13
 print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
-#Mean squared error for test: 101564.76
-len(lm.coef_)  #54
+#Mean squared error for test: 102710.50
 
 
 #4th model, combine numeric and labelencoded cat features
-#combined_train = pd.concat([X_train[['haversineDist']], pd.DataFrame(onehotlabels_train)], axis=1, join_axes=[X_train.index])
-#combined_test = pd.concat([X_test[['haversineDist']], pd.DataFrame(onehotlabels_test)], axis=1, join_axes=[X_test.index])
+combined_train = pd.concat([pd.DataFrame(X_train_scale), pd.DataFrame(onehotlabels_train)], axis=1)
+combined_test = pd.concat([pd.DataFrame(X_test_scale), pd.DataFrame(onehotlabels_test)], axis=1)
 
-haversinereset = X_train[['haversineDist']].reset_index(drop=True)
-combined_train = pd.concat([haversinereset, pd.DataFrame(onehotlabels_train)], axis=1, join_axes=[haversinereset.index])
-haversinereset_test = X_test[['haversineDist']].reset_index(drop=True)
-combined_test = pd.concat([haversinereset_test, pd.DataFrame(onehotlabels_test)], axis=1, join_axes=[haversinereset_test.index])
+#haversinereset = X_train[['haversineDist']].reset_index(drop=True)
+#combined_train = pd.concat([haversinereset, pd.DataFrame(onehotlabels_train)], axis=1, join_axes=[haversinereset.index])
+#haversinereset_test = X_test[['haversineDist']].reset_index(drop=True)
+#combined_test = pd.concat([haversinereset_test, pd.DataFrame(onehotlabels_test)], axis=1, join_axes=[haversinereset_test.index])
 
 lm = linear_model.LinearRegression()
 lm.fit(combined_train, Y_train)
 predict_train = lm.predict(combined_train)
 predict_test = lm.predict(combined_test)
 print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
-#Mean squared error for train 61093.97
+#Mean squared error for train 62131.18
 print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
-#Mean squared error for test: 61509.03
+#Mean squared error for test: 62030.55
 
 #5th model, regression tree
 from sklearn.tree import DecisionTreeRegressor
@@ -451,9 +520,9 @@ tree.fit(combined_train, Y_train)
 predict_train = tree.predict(combined_train)
 predict_test = tree.predict(combined_test)
 print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
-#Mean squared error for train 337.00
+#Mean squared error for train 10.68
 print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
-#Mean squared error for test: 93301.56
+#Mean squared error for test: 80741.43
 
 
 #6th model, random forest
@@ -463,10 +532,70 @@ RF.fit(combined_train, Y_train)
 predict_train = RF.predict(combined_train)
 predict_test = RF.predict(combined_test)
 print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
-#Mean squared error for train 58173.49
+#Mean squared error for train  59873.37
 print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
-#Mean squared error for test: 58288.05
+#Mean squared error for test: 59754.02
 
+
+#7th model, GBM
+from sklearn import ensemble
+params = {'n_estimators': 500, 'max_depth': 4, 'min_samples_split': 2,
+          'learning_rate': 0.01, 'loss': 'ls'}
+GBM = ensemble.GradientBoostingRegressor(**params)
+GBM.fit(combined_train, Y_train)
+predict_train = GBM.predict(combined_train)
+predict_test = GBM.predict(combined_test)
+print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
+#Mean squared error for train 51487.63
+print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
+#Mean squared error for test: 51714.15
+
+# #############################################################################
+# Plot feature importance
+feature_importance = GBM.feature_importances_
+# make importances relative to max importance
+feature_importance = 100.0 * (feature_importance / feature_importance.max())
+sorted_idx = np.argsort(feature_importance)
+pos = np.arange(sorted_idx.shape[0]) + .5
+plt.subplot(1, 2, 2)
+plt.barh(pos, feature_importance[sorted_idx], align='center')
+plt.yticks(pos, combined_train.feature_names[sorted_idx])
+plt.xlabel('Relative Importance')
+plt.title('Variable Importance')
+plt.show()
+
+
+#8th model, xgboost
+from xgboost import XGBRegressor
+import scipy.stats as st
+from sklearn.model_selection import RandomizedSearchCV
+
+params = {'min_child_weight':[4,5], 'gamma':[i/10.0 for i in range(3,6)],  'subsample':[i/10.0 for i in range(6,11)],
+'colsample_bytree':[i/10.0 for i in range(6,11)], 'max_depth': [2,3,4]}
+
+one_to_left = st.beta(10, 1)  
+from_zero_positive = st.expon(0, 50)
+params = {  
+    "n_estimators": st.randint(3, 40),
+    "max_depth": st.randint(3, 40),
+    "learning_rate": st.uniform(0.05, 0.4),
+    "colsample_bytree": one_to_left,
+    "subsample": one_to_left,
+    "gamma": st.uniform(0, 10),
+    'reg_alpha': from_zero_positive,
+    "min_child_weight": from_zero_positive,
+}
+
+
+XGB = XGBRegressor(nthread=-1)
+grid = RandomizedSearchCV(XGB, params, n_jobs=1)
+grid.fit(combined_train, Y_train)
+predict_train = grid.best_estimator_.predict(combined_train)
+predict_test = grid.best_estimator_.predict(combined_test)
+print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
+#Mean squared error for train 
+print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
+#Mean squared error for test: 
 
 
 
