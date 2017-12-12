@@ -297,7 +297,7 @@ Train.duration.describe()
 
 plt.hist(Train.duration, normed=True, bins=50)
 
-removedExtremeDurations = Train.loc[Train['duration'] < 1000]
+removedExtremeDurations = Train.loc[Train['duration'] < 2000]
 len(removedExtremeDurations)/len(Train) #0.7150309765867292
 plt.hist(removedExtremeDurations.duration, normed=True, bins=50)
 
@@ -559,58 +559,50 @@ plt.ylabel('duration')
 plt.title('start_isHoliday vs duration')
 plt.show()
 
+
+durationVSstart_dayOfWeek = removedExtremeDurations['duration'].groupby(removedExtremeDurations['start_dayOfWeek']).mean().to_frame()
+plt.plot(durationVSstart_dayOfWeek)
+
+durationVSstart_hour = removedExtremeDurations['duration'].groupby(removedExtremeDurations['start_hour']).mean().to_frame()
+plt.plot(durationVSstart_hour)
+
+durationVSstart_hour = removedExtremeDurations['duration'].groupby(removedExtremeDurations['start_hour']).mean().to_frame()
+plt.plot(durationVSstart_hour)
+
 #did not use features: start_date, start_time
 
 #transform dytpes:
-TrainFeatures = Train[['start_year', 'start_month', 'start_day',  'start_dayOfWeek',  'start_hour', 'start_minute', 'start_second', 'start_isWeekend',  'start_isHoliday','haversineDist', 'geoDist', 'start_geohash', 'end_geohash']]
-            
-TrainFeatures[['start_year', 'start_month', 'start_day', 'start_dayOfWeek', 'start_hour', 'start_minute', 'start_second', 'start_isWeekend',  'start_isHoliday', 'start_geohash', 'end_geohash']] = TrainFeatures[['start_year', 'start_month', 'start_day', 'start_dayOfWeek', 'start_hour', 'start_minute', 'start_second', 'start_isWeekend',  'start_isHoliday', 'start_geohash', 'end_geohash']].astype(object)
+#TrainFeatures = Train[['start_year', 'start_month', 'start_day',  'start_dayOfWeek',  'start_hour', 'start_minute', 'start_second', 'start_isWeekend',  'start_isHoliday','haversineDist', 'geoDist', 'start_geohash', 'end_geohash']]
+#            
+#TrainFeatures[['start_year', 'start_month', 'start_day', 'start_dayOfWeek', 'start_hour', 'start_minute', 'start_second', 'start_isWeekend',  'start_isHoliday', 'start_geohash', 'end_geohash']] = TrainFeatures[['start_year', 'start_month', 'start_day', 'start_dayOfWeek', 'start_hour', 'start_minute', 'start_second', 'start_isWeekend',  'start_isHoliday', 'start_geohash', 'end_geohash']].astype(object)
 
 '''
 First round, duration as target.
 '''
+
+#try data with outliers removed 
+removedExtremeDurations = Train.loc[Train['duration'] < 1500]
+len(removedExtremeDurations)/len(Train) #0.8822549380046639
+plt.hist(removedExtremeDurations.duration, normed=True, bins=50)
+
+TrainFeatures = removedExtremeDurations[['start_year', 'start_month', 'start_day',  'start_dayOfWeek',  'start_hour', 'start_minute', 'start_second', 'start_isWeekend',  'start_isHoliday','haversineDist', 'geoDist', 'start_geohash', 'end_geohash']]
+            
+TrainFeatures[['start_year', 'start_month', 'start_day', 'start_dayOfWeek', 'start_hour', 'start_minute', 'start_second', 'start_isWeekend',  'start_isHoliday', 'geoDist', 'start_geohash', 'end_geohash']] = TrainFeatures[['start_year', 'start_month', 'start_day', 'start_dayOfWeek', 'start_hour', 'start_minute', 'start_second', 'start_isWeekend',  'start_isHoliday', 'geoDist', 'start_geohash', 'end_geohash']].astype(object)
+
+
 #baseline model: regression only use numeric features
-X_train, X_test, Y_train, Y_test= train_test_split(TrainFeatures, Train['duration'], test_size=0.3, random_state=2017)
+X_train, X_test, Y_train, Y_test= train_test_split(TrainFeatures, removedExtremeDurations['duration'], test_size=0.4, random_state=2017)
 print(len(X_train), len(X_test), len(Y_train), len(Y_test))
-#6524998 2796429 6524998 2796429
+#4934325 3289550 4934325 3289550
 
-lm = linear_model.LinearRegression()
-lm.fit(X_train[['haversineDist', 'geoDist']], Y_train)
-predict_train = lm.predict(X_train[['haversineDist', 'geoDist']])
-predict_test = lm.predict(X_test[['haversineDist', 'geoDist']])
-print('Coefficients: \n', lm.coef_) 
-#Coefficients: 
-#   [  2.08374371e+02  -1.55801116e-04]
-print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
-#Mean squared error 252147.64
-print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
-#Mean squared error: 248125.32
-
-plt.scatter(Y_test, predict_test)
-plt.xlabel('duration actual')
-plt.ylabel('duration predicted')
-plt.title('duration actual vs predicted')
-plt.show()
-
-#residual plot
-plt.scatter(predict_train, predict_train - Y_train, c = 'b', s = 40, alpha = 0.5)
-plt.scatter(predict_test, predict_test - Y_test, c = 'g', s =40)
-plt.hlines(y = 0, xmin = 0, xmax = 50)
-plt.title('Residual Plot using Train(blue) and Test(green)')
-plt.ylabel('residual')
-
-#2nd model, using haversineDist only.
 lm = linear_model.LinearRegression()
 lm.fit(X_train[['haversineDist']], Y_train)
 predict_train = lm.predict(X_train[['haversineDist']])
 predict_test = lm.predict(X_test[['haversineDist']])
-print('Coefficients: \n', lm.coef_) 
-#Coefficients: 
-#   [ 205.46542746]
 print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
-#Mean squared error for train 253120.89
+#Mean squared error for train 70151.65
 print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
-#Mean squared error for test: 249066.52
+#Mean squared error for test: 70083.86
 
 plt.scatter(Y_test, predict_test)
 plt.xlabel('duration actual')
@@ -626,20 +618,17 @@ plt.title('Residual Plot using Train(blue) and Test(green)')
 plt.ylabel('residual')
 
 #3rd model, scale numeric features for regression
-X_train_scale=scale(X_train[['haversineDist', 'geoDist']])
-X_test_scale=scale(X_test[['haversineDist', 'geoDist']])
+X_train_scale=scale(X_train[['haversineDist']])
+X_test_scale=scale(X_test[['haversineDist']])
 
 lm = linear_model.LinearRegression()
 lm.fit(X_train_scale, Y_train)
 predict_train = lm.predict(X_train_scale)
 predict_test = lm.predict(X_test_scale)
-print('Coefficients: \n', lm.coef_) 
-#Coefficients: 
-#   [ 500.11243613  -31.96860494]
 print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
-#Mean squared error for train 252147.64
+#Mean squared error for train 70151.65
 print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
-#Mean squared error for test: 248125.49
+#Mean squared error for test: 70083.89
 
 plt.scatter(Y_test, predict_test)
 plt.xlabel('duration actual')
@@ -658,25 +647,21 @@ plt.ylabel('residual')
 le=LabelEncoder()
 Cat_Train = X_train.select_dtypes(include=[object])
 Cat_Train = Cat_Train.apply(le.fit_transform)
-Cat_Train.head()
+#Cat_Train.head()
 
 le=LabelEncoder()
 Cat_test = X_test.select_dtypes(include=[object])
 Cat_test = Cat_test.apply(le.fit_transform)
-Cat_test.head()
+#Cat_test.head()
 
 lm = linear_model.LinearRegression()
 lm.fit(Cat_Train, Y_train)
 predict_train = lm.predict(Cat_Train)
 predict_test = lm.predict(Cat_test)
-print('Coefficients: \n', lm.coef_) 
-#Coefficients: 
-# [  0.00000000e+00   1.02581980e+01   6.16759392e-01 ...,  -1.16925906e+02
-#   3.33917195e-05  -1.85970465e-05]
 print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
-#Mean squared error for train 490352.49
+#Mean squared error for train 109110.30
 print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
-#Mean squared error for test: 488540.30
+#Mean squared error for test: 110025.56
 
 plt.scatter(Y_test, predict_test)
 plt.xlabel('duration actual')
@@ -692,21 +677,17 @@ plt.title('Residual Plot using Train(blue) and Test(green)')
 plt.ylabel('residual')
 
 #5th model, combine numeric and labelencoded cat features
-combined_train = pd.concat([X_train[['haversineDist', 'geoDist']], Cat_Train], axis=1, join_axes=[X_train.index])
-combined_test = pd.concat([X_test[['haversineDist', 'geoDist']], Cat_test], axis=1, join_axes=[X_test.index])
+combined_train = pd.concat([X_train[['haversineDist']], Cat_Train], axis=1, join_axes=[X_train.index])
+combined_test = pd.concat([X_test[['haversineDist']], Cat_test], axis=1, join_axes=[X_test.index])
 
 lm = linear_model.LinearRegression()
 lm.fit(combined_train, Y_train)
 predict_train = lm.predict(combined_train)
 predict_test = lm.predict(combined_test)
-print('Coefficients: \n', lm.coef_) 
-#Coefficients: 
-# [  2.08543323e+02  -7.32428913e-05  -1.98193963e-10 ...,  -1.53142883e+02
-#  -1.19691748e-06  -2.31358165e-05]
 print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
-#Mean squared error for train 246702.90
+#Mean squared error for train 67735.14
 print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
-#Mean squared error for test: 244700.53
+#Mean squared error for test: 68306.26
 
 plt.scatter(Y_test, predict_test)
 plt.xlabel('duration actual')
@@ -721,26 +702,106 @@ plt.hlines(y = 0, xmin = 0, xmax = 50)
 plt.title('Residual Plot using Train(blue) and Test(green)')
 plt.ylabel('residual')
 
-#6th model, SVM with combined features
+#6th model, haversine, hour, dayofweek
+selected_train = combined_train[['haversineDist', 'start_dayOfWeek', 'start_hour']]
+selected_test = combined_test[['haversineDist', 'start_dayOfWeek', 'start_hour']]
+
+lm = linear_model.LinearRegression()
+lm.fit(selected_train, Y_train)
+predict_train = lm.predict(selected_train)
+predict_test = lm.predict(selected_test)
+print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
+#Mean squared error for train 69624.45
+print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
+#Mean squared error for test: 69546.45
+
+plt.scatter(Y_test, predict_test)
+plt.xlabel('duration actual')
+plt.ylabel('duration predicted')
+plt.title('duration actual vs predicted')
+plt.show()
+
+#residual plot
+plt.scatter(predict_train, predict_train - Y_train, c = 'b', s = 40, alpha = 0.5)
+plt.scatter(predict_test, predict_test - Y_test, c = 'g', s =40)
+plt.hlines(y = 0, xmin = 0, xmax = 50)
+plt.title('Residual Plot using Train(blue) and Test(green)')
+plt.ylabel('residual')
+
+#7th model, regression tree
+from sklearn.tree import DecisionTreeRegressor
+tree = DecisionTreeRegressor(random_state=0)
+tree.fit(combined_train, Y_train)
+predict_train = tree.predict(combined_train)
+predict_test = tree.predict(combined_test)
+print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
+#Mean squared error for train 0.00
+print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
+#Mean squared error for test: 102015.59
+
+plt.scatter(Y_test, predict_test)
+plt.xlabel('duration actual')
+plt.ylabel('duration predicted')
+plt.title('duration actual vs predicted')
+plt.show()
+
+#residual plot
+plt.scatter(predict_train, predict_train - Y_train, c = 'b', s = 40, alpha = 0.5)
+plt.scatter(predict_test, predict_test - Y_test, c = 'g', s =40)
+plt.hlines(y = 0, xmin = 0, xmax = 50)
+plt.title('Residual Plot using Train(blue) and Test(green)')
+plt.ylabel('residual')
+
+#8th model, random forest
+from sklearn.ensemble import RandomForestRegressor
+RF = RandomForestRegressor(max_depth=3, random_state=0)
+RF.fit(combined_train, Y_train)
+predict_train = RF.predict(combined_train)
+predict_test = RF.predict(combined_test)
+print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
+#Mean squared error for train 57608.14
+print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
+#Mean squared error for test: 57588.18
+
+plt.scatter(Y_test, predict_test)
+plt.xlabel('duration actual')
+plt.ylabel('duration predicted')
+plt.title('duration actual vs predicted')
+plt.show()
+
+#residual plot
+plt.scatter(predict_train, predict_train - Y_train, c = 'b', s = 40, alpha = 0.5)
+plt.scatter(predict_test, predict_test - Y_test, c = 'g', s =40)
+plt.hlines(y = 0, xmin = 0, xmax = 50)
+plt.title('Residual Plot using Train(blue) and Test(green)')
+plt.ylabel('residual')
+
+#9th model, SVR with combined features
 from sklearn import svm
-clf = svm.SVR()
-clf.fit(combined_train, Y_train)
-predict_train = clf.predict(combined_train)
-predict_test = clf.predict(combined_test)
-print('Coefficients: \n', clf.coef_) 
-#Coefficients: 
-# [  2.08543323e+02  -7.32428913e-05  -1.98193963e-10 ...,  -1.53142883e+02
-#  -1.19691748e-06  -2.31358165e-05]
+svr_rbf = svm.SVR(kernel='rbf', C=1e3, gamma=0.1)
+svr_rbf.fit(combined_train, Y_train)
+predict_train = svr_rbf.predict(combined_train)
+predict_test = svr_rbf.predict(combined_test)
 print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
 #Mean squared error for train 246702.90
 print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
 #Mean squared error for test: 244700.53
 
+#10th model, kernel ridge with combined features
+from sklearn.kernel_ridge import KernelRidge
+KR = KernelRidge(alpha=1.0)
+KR.fit(combined_train, Y_train)
+predict_train = KR.predict(combined_train)
+predict_test = KR.predict(combined_test)
+print("Mean squared error for train: %.2f" % mean_squared_error(Y_train, predict_train))
+#Mean squared error for train 246702.90
+print("Mean squared error for test: %.2f" % mean_squared_error(Y_test, predict_test))
+#Mean squared error for test: 244700.53
+
+#haversine transformation, nonlinear
 
 
-
-
-#6h model, use backward difference encoding for cat features:
+#...th model, use backward difference encoding for cat features:
 import category_encoders as ce
 BackwardDiff_train = X_train.select_dtypes(include=['object']).copy()
 encoder = ce.backward_difference.BackwardDifferenceEncoder()
@@ -768,446 +829,6 @@ predict_test = lm.predict(Cat_test)
 print('Coefficients: \n', lm.coef_) 
 
 
-
-
-
-
-
-#7th model, include categorical features with LabelEncoder
-le=LabelEncoder()
-Cat_Train = X_train.select_dtypes(include=[object])
-Cat_Train = Cat_Train.apply(le.fit_transform)
-Cat_Train.head()
-
-enc = OneHotEncoder()
-enc.fit(Cat_Train)
-
-onehotlabels_Train = enc.fit_transform((Cat_Train).as_matrix())
-#onehotlabels = enc.transform(Cat_Train).toarray()
-#onehotlabels.shape
-
-le=LabelEncoder()
-Cat_test = X_test.select_dtypes(include=[object])
-Cat_test = Cat_test.apply(le.fit_transform)
-Cat_test.head()
-
-enc = OneHotEncoder()
-enc.fit(Cat_test)
-
-onehotlabels_test = enc.fit_transform((Cat_test).as_matrix())
-
-
-regr = linear_model.LinearRegression()
-regr.fit(Cat_Train, Y_train)
-duration_y_pred = regr.predict(Cat_test)
-print('Coefficients: \n', regr.coef_) 
-#Coefficients: 
-#  [  0.00000000e+00   1.04798014e+01   6.60495089e-01   1.52321316e+01
-#   4.65772139e+00  -1.16021115e+02  -1.16269874e+02   1.06234950e-04
-#  -6.09924613e-05]
-print("Mean squared error: %.2f" % mean_squared_error(Y_test, duration_y_pred))
-#Mean squared error: 511824.50
-print('Variance score: %.2f' % r2_score(Y_test, duration_y_pred))
-#Variance score: -0.04
-
-
-
-from sklearn import tree
-RF = tree.DecisionTreeClassifier(criterion='gini') # for classification, here you can change the algorithm as gini or entropy (information gain) by default it is gini  
-RF.fit(X_train_scale,Y_train)
-#DecisionTreeClassifier(class_weight=None, criterion='gini', max_depth=None,
-#            max_features=None, max_leaf_nodes=None,
-#            min_impurity_split=1e-07, min_samples_leaf=1,
-#            min_samples_split=2, min_weight_fraction_leaf=0.0,
-#            presort=False, random_state=None, splitter='best')
-accuracy_score(Y_test,RF.predict(X_test_scale))
-#0.65559400607227969
-
-
-##One hot encoder
-from sklearn.preprocessing import OneHotEncoder
-enc=OneHotEncoder(sparse=False)
-X_train_1=X_train
-X_test_1=X_test
-columns=['DeviceFamily', 'OSSkuName', 'FlightRing', 'OSArchitecture','PrimaryDiskTypeName', 'MDC2FormFactor', 'DisplayLanguage',  'Region','DeviceType', 'AgeGroup', 'Gender', 'BuildNumber', 'Branch']
-for col in columns:
-       # creating an exhaustive list of all possible categorical values
-       data=X_train[[col]].append(X_test[[col]])
-       enc.fit(data)
-       # Fitting One Hot Encoding on train data
-       temp = enc.transform(X_train[[col]])
-       # Changing the encoded features into a data frame with new column names
-       temp=pd.DataFrame(temp,columns=[(col+"_"+str(i)) for i in data[col]
-            .value_counts().index])
-       # In side by side concatenation index values should be same
-       # Setting the index values similar to the X_train data frame
-       temp=temp.set_index(X_train.index.values)
-       # adding the new One Hot Encoded varibales to the train data frame
-       X_train_1=pd.concat([X_train_1,temp],axis=1)
-       # fitting One Hot Encoding on test data
-       temp = enc.transform(X_test[[col]])
-       # changing it into data frame and adding column names
-       temp=pd.DataFrame(temp,columns=[(col+"_"+str(i)) for i in data[col]
-            .value_counts().index])
-       # Setting the index for proper concatenation
-       temp=temp.set_index(X_test.index.values)
-       # adding the new One Hot Encoded varibales to test data frame
-       X_test_1=pd.concat([X_test_1,temp],axis=1)
-
-# Standardizing the data set
-X_train_scale=scale(X_train_1)
-X_test_scale=scale(X_test_1)
-# Fitting a logistic regression model
-log=LogisticRegression(penalty='l2',C=1)
-log.fit(X_train_scale,Y_train)
-#LogisticRegression(C=1, class_weight=None, dual=False, fit_intercept=True,
-#          intercept_scaling=1, max_iter=100, multi_class='ovr', n_jobs=1,
-#          penalty='l2', random_state=None, solver='liblinear', tol=0.0001,
-#          verbose=0, warm_start=False)
-# Checking the model's accuracy
-accuracy_score(Y_test,log.predict(X_test_scale))
-#0.70990173353791908
-
-scores = sklearn.metrics.classification_report(Y_test, log.predict(X_test_scale))
-print(scores)
-#             precision    recall  f1-score   support
-#
-#        0.0       0.68      0.79      0.73     30565
-#        1.0       0.75      0.63      0.68     30697
-#
-#avg / total       0.71      0.71      0.71     61262
-
-#np.set_printoptions(threshold=np.nan)
-#np.set_printoptions(linewidth=75)
-
-print(log.coef_)
-
-print(log.intercept_)
-#[ 0.08490617]
-
-
-   
-
-from sklearn.ensemble import RandomForestRegressor
-rf = RandomForestRegressor()
-rf.fit(X_train_scale,Y_train)
-#RandomForestRegressor(bootstrap=True, criterion='mse', max_depth=None,
-#           max_features='auto', max_leaf_nodes=None,
-#           min_impurity_split=1e-07, min_samples_leaf=1,
-#           min_samples_split=2, min_weight_fraction_leaf=0.0,
-#           n_estimators=10, n_jobs=1, oob_score=False, random_state=None,
-#           verbose=0, warm_start=False)
-names = ['VisibleNotificationCount', 'DeviceFamily', 'OSSkuName', 'FlightRing', 'OSArchitecture', 'TotalPhysicalRAM', 'PrimaryDiskTypeName', 'ProcessorPhysicalCores', 'ProcessorCores', 'MDC2FormFactor', 'DisplayLanguage',  'Region','DeviceType', 'AgeGroup', 'Gender', 'BuildNumber', 'Branch', 'RevisionNumber', 'EngagementTimeS']
-print ("Features sorted by their score:")
-print (sorted(zip(map(lambda x: round(x, 4), rf.feature_importances_), names), 
-             reverse=True))
-'''
-[(0.2485, 'EngagementTimeS'), (0.067199999999999996, 'TotalPhysicalRAM'), (0.050200000000000002, 'VisibleNotificationCount'), (0.027300000000000001, 'RevisionNumber'), (0.025999999999999999, 'DisplayLanguage'), (0.025000000000000001, 'Region'), (0.021299999999999999, 'ProcessorCores'), (0.0212, 'AgeGroup'), (0.016400000000000001, 'ProcessorPhysicalCores'), (0.014500000000000001, 'OSSkuName'), (0.011299999999999999, 'BuildNumber'), (0.0111, 'FlightRing'), (0.0091999999999999998, 'Gender'), (0.0089999999999999993, 'MDC2FormFactor'), (0.0038, 'DeviceType'), (0.0030999999999999999, 'PrimaryDiskTypeName'), (0.0019, 'OSArchitecture'), (0.001, 'Branch'), (0.0, 'DeviceFamily')]
-'''
-
-
-from sklearn.feature_selection import RFE
-model = LogisticRegression()
-rfe = RFE(model, 5)
-rfe = rfe.fit(X_train_scale,Y_train)
-# summarize the selection of the attributes
-print(rfe.support_)
-print(rfe.ranking_)
-
-
-
-from sklearn.ensemble import ExtraTreesClassifier
-model = ExtraTreesClassifier()
-model.fit(X_train_scale,Y_train)
-print(model.feature_importances_)
-
-
-print ("Features sorted by their score:")
-print (sorted(zip(map(lambda x: round(x, 4), model.feature_importances_), names), 
-             reverse=True))
-'''
-[(0.26900000000000002, 'EngagementTimeS'), (0.091399999999999995, 'VisibleNotificationCount'), (0.064299999999999996, 'TotalPhysicalRAM'), (0.041700000000000001, 'RevisionNumber'), (0.028299999999999999, 'DeviceType'), (0.019900000000000001, 'ProcessorPhysicalCores'), (0.014200000000000001, 'ProcessorCores'), (0.011599999999999999, 'AgeGroup'), (0.010999999999999999, 'DisplayLanguage'), (0.010200000000000001, 'Region'), (0.0092999999999999992, 'BuildNumber'), (0.0074999999999999997, 'OSSkuName'), (0.0066, 'PrimaryDiskTypeName'), (0.0057000000000000002, 'MDC2FormFactor'), (0.0055999999999999999, 'Gender'), (0.0051999999999999998, 'OSArchitecture'), (0.0045999999999999999, 'FlightRing'), (0.0011000000000000001, 'Branch'), (0.00020000000000000001, 'DeviceFamily')]
-'''
-#np.set_printoptions()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-'''
-First round, use PassOrFail as target.
-'''
-X_train, X_test, Y_train, Y_test= train_test_split(DatFeatures, DatAll_downAll_deduped['Passing'], test_size=0.2, random_state=2017)
-print(len(X_train), len(X_test), len(Y_train), len(Y_test))
-#176288 44072 176288 44072
-
-
-# Standardizing the train and test data
-from sklearn.preprocessing import scale
-X_train_scale=scale(X_train[['VisibleNotificationCount', 'TotalPhysicalRAM', 'ProcessorPhysicalCores', 'ProcessorCores', 'EngagementTimeS']])
-X_test_scale=scale(X_test[['VisibleNotificationCount', 'TotalPhysicalRAM', 'ProcessorPhysicalCores', 'ProcessorCores', 'EngagementTimeS']])
-
-
-#labelEncode categorical features
-from sklearn.preprocessing import LabelEncoder
-le=LabelEncoder()
-
-# Iterating over all the common columns in train and test
-for col in X_test.columns.values:
-       # Encoding only categorical variables
-    if X_test[col].dtypes=='object':
-       # Using whole data to form an exhaustive list of levels
-        data=X_train[col].append(X_test[col])
-        le.fit(data.values)
-        X_train[col]=le.transform(X_train[col])
-        X_test[col]=le.transform(X_test[col])
-
-
-##One hot encoder
-from sklearn.preprocessing import OneHotEncoder
-enc=OneHotEncoder(sparse=False)
-X_train_1=X_train
-X_test_1=X_test
-columns=['DeviceFamily', 'OSSkuName', 'FlightRing', 'OSArchitecture','PrimaryDiskTypeName', 'MDC2FormFactor', 'DisplayLanguage',  'Region','DeviceType', 'AgeGroup', 'Gender', 'BuildNumber', 'Branch']
-for col in columns:
-       # creating an exhaustive list of all possible categorical values
-       data=X_train[[col]].append(X_test[[col]])
-       enc.fit(data)
-       # Fitting One Hot Encoding on train data
-       temp = enc.transform(X_train[[col]])
-       # Changing the encoded features into a data frame with new column names
-       temp=pd.DataFrame(temp,columns=[(col+"_"+str(i)) for i in data[col]
-            .value_counts().index])
-       # In side by side concatenation index values should be same
-       # Setting the index values similar to the X_train data frame
-       temp=temp.set_index(X_train.index.values)
-       # adding the new One Hot Encoded varibales to the train data frame
-       X_train_1=pd.concat([X_train_1,temp],axis=1)
-       # fitting One Hot Encoding on test data
-       temp = enc.transform(X_test[[col]])
-       # changing it into data frame and adding column names
-       temp=pd.DataFrame(temp,columns=[(col+"_"+str(i)) for i in data[col]
-            .value_counts().index])
-       # Setting the index for proper concatenation
-       temp=temp.set_index(X_test.index.values)
-       # adding the new One Hot Encoded varibales to test data frame
-       X_test_1=pd.concat([X_test_1,temp],axis=1)
-
-# Standardizing the data set
-X_train_scale=scale(X_train_1)
-X_test_scale=scale(X_test_1)
-# Fitting a logistic regression model
-log=LogisticRegression(penalty='l2',C=1)
-log.fit(X_train_scale,Y_train)
-#LogisticRegression(C=1, class_weight=None, dual=False, fit_intercept=True,
-#          intercept_scaling=1, max_iter=100, multi_class='ovr', n_jobs=1,
-#          penalty='l2', random_state=None, solver='liblinear', tol=0.0001,
-#          verbose=0, warm_start=False)
-accuracy_score(Y_test,log.predict(X_test_scale))
-# 0.72365674351061904
-
-scores = sklearn.metrics.classification_report(Y_test, log.predict(X_test_scale))
-print(scores)
-#             precision    recall  f1-score   support
-#
-#        0.0       0.69      0.81      0.74     21838
-#        1.0       0.77      0.64      0.70     22234
-#
-#avg / total       0.73      0.72      0.72     44072
-
-#np.set_printoptions(threshold=np.nan)
-#np.set_printoptions(linewidth=75)
-
-print(log.coef_)
-#[[-0.0643656  -0.07481585  0.03228945 ...,  0.01742683  0.          0.03055134]]
-
-print(log.intercept_)
-#[ 0.11294616]
-
-
-   
-
-from sklearn.ensemble import RandomForestRegressor
-rf = RandomForestRegressor()
-rf.fit(X_train_scale,Y_train)
-#RandomForestRegressor(bootstrap=True, criterion='mse', max_depth=None,
-#           max_features='auto', max_leaf_nodes=None,
-#           min_impurity_split=1e-07, min_samples_leaf=1,
-#           min_samples_split=2, min_weight_fraction_leaf=0.0,
-#           n_estimators=10, n_jobs=1, oob_score=False, random_state=None,
-#           verbose=0, warm_start=False)
-names = ['VisibleNotificationCount', 'DeviceFamily', 'OSSkuName', 'FlightRing', 'OSArchitecture', 'TotalPhysicalRAM', 'PrimaryDiskTypeName', 'ProcessorPhysicalCores', 'ProcessorCores', 'MDC2FormFactor', 'DisplayLanguage',  'Region','DeviceType', 'AgeGroup', 'Gender', 'BuildNumber', 'Branch', 'RevisionNumber', 'EngagementTimeS']
-print ("Features sorted by their score:")
-print (sorted(zip(map(lambda x: round(x, 4), rf.feature_importances_), names), 
-             reverse=True))
-
-# make importances relative to max importance
-feature_importance = 100.0 * (rf.feature_importances_ / rf.feature_importances_.max())
-sorted_idx = np.argsort(feature_importance)
-pos = np.arange(sorted_idx.shape[0]) + .5
-plt.subplot(1, 2, 2)
-plt.barh(pos, feature_importance[sorted_idx], align='center')
-plt.yticks(pos, names[sorted_idx])
-plt.xlabel('Relative Importance')
-plt.title('Variable Importance')
-plt.show()
-
-'''
-[(0.23760000000000001, 'EngagementTimeS'), (0.053699999999999998, 'TotalPhysicalRAM'), (0.050500000000000003, 'VisibleNotificationCount'), (0.0292, 'FlightRing'), (0.027300000000000001, 'RevisionNumber'), (0.027199999999999998, 'DisplayLanguage'), (0.026599999999999999, 'Region'), (0.020799999999999999, 'AgeGroup'), (0.0167, 'ProcessorPhysicalCores'), (0.0147, 'OSSkuName'), (0.0135, 'ProcessorCores'), (0.0124, 'DeviceType'), (0.0091000000000000004, 'BuildNumber'), (0.0088000000000000005, 'Gender'), (0.0082000000000000007, 'MDC2FormFactor'), (0.0030999999999999999, 'PrimaryDiskTypeName'), (0.0019, 'OSArchitecture'), (0.001, 'Branch'), (0.0, 'DeviceFamily')]
-
-'''
-
-from sklearn.ensemble import ExtraTreesClassifier
-model = ExtraTreesClassifier()
-model.fit(X_train_scale,Y_train)
-print(model.feature_importances_)
-#[  8.19000214e-02   3.56440975e-05   8.32658379e-03 ...,   8.70827070e-07
-#   0.00000000e+00   9.04001649e-06]
-
-print ("Features sorted by their score:")
-print (sorted(zip(map(lambda x: round(x, 4), model.feature_importances_), names), 
-             reverse=True))
-'''
-[(0.25650000000000001, 'EngagementTimeS'), (0.081900000000000001, 'VisibleNotificationCount'), (0.066600000000000006, 'TotalPhysicalRAM'), (0.042799999999999998, 'RevisionNumber'), (0.0247, 'DeviceType'), (0.023900000000000001, 'PrimaryDiskTypeName'), (0.021299999999999999, 'ProcessorPhysicalCores'), (0.0143, 'ProcessorCores'), (0.012, 'DisplayLanguage'), (0.011599999999999999, 'AgeGroup'), (0.010500000000000001, 'Region'), (0.0083000000000000001, 'OSSkuName'), (0.0077999999999999996, 'MDC2FormFactor'), (0.0057000000000000002, 'Gender'), (0.0055999999999999999, 'BuildNumber'), (0.0051000000000000004, 'OSArchitecture'), (0.0037000000000000002, 'FlightRing'), (0.0011000000000000001, 'Branch'), (0.0, 'DeviceFamily')]
-'''
-#np.set_printoptions()
-
-for name, importance in sorted(zip(model.feature_importances_, names), reverse=True):
-    print(name, "=", importance)   
-'''
-0.254097220876 = EngagementTimeS
-0.0817846877791 = VisibleNotificationCount
-0.0664166324479 = TotalPhysicalRAM
-0.0431640824195 = RevisionNumber
-0.0293274216328 = DeviceType
-0.0207134940651 = ProcessorPhysicalCores
-0.0142610027439 = ProcessorCores
-0.0124509316885 = AgeGroup
-0.0113656818076 = DisplayLanguage
-0.0110250703106 = Region
-0.00837632629131 = OSSkuName
-0.00730619623485 = PrimaryDiskTypeName
-0.00644724746645 = MDC2FormFactor
-0.00566745746203 = Gender
-0.0051203574513 = BuildNumber
-0.00382524601162 = FlightRing
-0.00315303031042 = OSArchitecture
-0.000808481761945 = Branch
-0.000127771233368 = DeviceFamily
-'''    
-
-
-
-from sklearn.ensemble import RandomForestClassifier
-clf = RandomForestClassifier()
-clf.fit(X_train_scale,Y_train)
-#RandomForestClassifier(bootstrap=True, class_weight=None, criterion='gini',
-#            max_depth=None, max_features='auto', max_leaf_nodes=None,
-#            min_impurity_split=1e-07, min_samples_leaf=1,
-#            min_samples_split=2, min_weight_fraction_leaf=0.0,
-#            n_estimators=10, n_jobs=1, oob_score=False, random_state=None,
-#            verbose=0, warm_start=False)   
-for name, importance in sorted(zip(clf.feature_importances_, names), reverse=True):
-    print(name, "=", importance)     
-'''
-0.239317367189 = EngagementTimeS
-0.0722053495696 = VisibleNotificationCount
-0.0699863771396 = TotalPhysicalRAM
-0.0585020065189 = DeviceType
-0.035730417737 = RevisionNumber
-0.034566190426 = PrimaryDiskTypeName
-0.0238730792509 = ProcessorCores
-0.0205154655473 = DisplayLanguage
-0.0188914852168 = ProcessorPhysicalCores
-0.0188259078132 = AgeGroup
-0.0182184665692 = Region
-0.0153350737671 = MDC2FormFactor
-0.0118238117941 = OSSkuName
-0.0114093559503 = BuildNumber
-0.00771975740702 = Gender
-0.0051393411259 = FlightRing
-0.00429025923078 = Branch
-0.00278516352104 = OSArchitecture
-0.000156517865889 = DeviceFamily
-'''
-#importances = clf.feature_importances_
-#indices = np.argsort(importances)
-feats = {} # a dict to hold feature_name: feature_importance
-for feature, importance in zip(DatFeatures, clf.feature_importances_):
-    feats[feature] = importance #add the name/value pair 
-importances = pd.DataFrame.from_dict(feats, orient='index').rename(columns={0: 'Gini-importance'})
-importances.sort_values(by='Gini-importance').plot(kind='bar', rot=45)
-
-
-
-
-
-
-'''
-do not need the following
-'''
-#check out dist for numeric features
-X_train[X_train.dtypes[(X_train.dtypes=="float64")|(X_train.dtypes=="int32")]
-                        .index.values].hist(figsize=[11,11])
-
-from sklearn.neighbors import KNeighborsClassifier
-knn=KNeighborsClassifier(n_neighbors=5)
-knn.fit(X_train[['VisibleNotificationCount', 'TotalPhysicalRAM', 'ProcessorPhysicalCores', 'ProcessorCores', 'EngagementTimeS']],Y_train)
-#KNeighborsClassifier(algorithm='auto', leaf_size=30, metric='minkowski',
-#           metric_params=None, n_jobs=1, n_neighbors=5, p=2,
-#           weights='uniform')
-
-from sklearn.metrics import accuracy_score
-accuracy_score(Y_test,knn.predict(X_test[['VisibleNotificationCount', 'TotalPhysicalRAM', 'ProcessorPhysicalCores', 'ProcessorCores', 'EngagementTimeS']]))
-#0.61511214129476677
-
-LR = LogisticRegression() 
-LR.fit(X_train[['VisibleNotificationCount', 'TotalPhysicalRAM', 'ProcessorPhysicalCores', 'ProcessorCores', 'EngagementTimeS']], Y_train)
-#LogisticRegression(C=1.0, class_weight=None, dual=False, fit_intercept=True,
-#          intercept_scaling=1, max_iter=100, multi_class='ovr', n_jobs=1,
-#          penalty='l2', random_state=None, solver='liblinear', tol=0.0001,
-#          verbose=0, warm_start=False)
-
-accuracy_score(Y_test,LR.predict(X_test[['VisibleNotificationCount', 'TotalPhysicalRAM', 'ProcessorPhysicalCores', 'ProcessorCores', 'EngagementTimeS']]))
-#0.62764846070973845
-
-
-# Importing MinMaxScaler and initializing it
-from sklearn.preprocessing import MinMaxScaler
-min_max=MinMaxScaler()
-# Scaling down both train and test data set
-X_train_minmax=min_max.fit_transform(X_train[['VisibleNotificationCount', 'TotalPhysicalRAM', 'ProcessorPhysicalCores', 'ProcessorCores', 'EngagementTimeS']])
-X_test_minmax=min_max.fit_transform(X_test[['VisibleNotificationCount', 'TotalPhysicalRAM', 'ProcessorPhysicalCores', 'ProcessorCores', 'EngagementTimeS']])
-
-from sklearn.neighbors import KNeighborsClassifier
-knn=KNeighborsClassifier(n_neighbors=5)
-knn.fit(X_train_minmax, Y_train)
-#KNeighborsClassifier(algorithm='auto', leaf_size=30, metric='minkowski',
-#           metric_params=None, n_jobs=1, n_neighbors=5, p=2,
-#           weights='uniform')
-
-from sklearn.metrics import accuracy_score
-accuracy_score(Y_test,knn.predict(X_test_minmax))
-#0.5877052659070876
-
-LR = LogisticRegression() 
-LR.fit(X_train_minmax, Y_train)
-#LogisticRegression(C=1.0, class_weight=None, dual=False, fit_intercept=True,
-#          intercept_scaling=1, max_iter=100, multi_class='ovr', n_jobs=1,
-#          penalty='l2', random_state=None, solver='liblinear', tol=0.0001,
-#          verbose=0, warm_start=False)
-
-accuracy_score(Y_test,LR.predict(X_test[['VisibleNotificationCount', 'TotalPhysicalRAM', 'ProcessorPhysicalCores', 'ProcessorCores', 'EngagementTimeS']]))
-#0.50115895661258203
 
 
 
